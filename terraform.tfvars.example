@@ -1,0 +1,18 @@
+project_id                 = "replace-with-gcp-project-id"
+region                     = "asia-northeast1"
+environment                = "prod"
+organization_slug          = "example"
+backend_image              = "asia-northeast1-docker.pkg.dev/replace/openclaw/backend@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+gateway_image              = "asia-northeast1-docker.pkg.dev/replace/openclaw/gateway@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+auth_bootstrap_image       = "asia-northeast1-docker.pkg.dev/replace/openclaw/auth-bootstrap@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+migration_image            = "asia-northeast1-docker.pkg.dev/replace/openclaw/migrate@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+allowed_domain             = "example.com"
+google_client_id           = "replace.apps.googleusercontent.com"
+google_oauth_redirect_uri  = "https://gateway.example.com/oauth/callback"
+iap_access_members         = ["group:openclaw-users@example.com"]
+notification_channels      = ["projects/replace/notificationChannels/replace"]
+database_availability_type = "REGIONAL"
+
+# First apply: both false. Add secret versions, enable/execute migration, then enable services.
+deploy_migration_job = false
+deploy_services      = false
