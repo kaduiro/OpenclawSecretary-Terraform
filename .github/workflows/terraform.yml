@@ -38,6 +38,9 @@ jobs:
       - run: terraform init -backend=false
       - run: terraform validate
       - run: terraform test
+      - run: terraform -chdir=vps/terraform init -backend=false
+      - run: terraform -chdir=vps/terraform validate
+      - run: node tools/check-vps-boundaries.mjs
       - run: terraform -chdir=bootstrap/state init -backend=false
       - run: terraform -chdir=bootstrap/state validate
       - run: tflint --init
