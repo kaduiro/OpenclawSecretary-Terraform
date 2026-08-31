@@ -304,10 +304,6 @@ resource "google_cloud_run_v2_service" "auth_bootstrap" {
   depends_on = [google_project_service.required]
 }
 
-locals {
-  api_uri = var.deploy_services ? google_cloud_run_v2_service.api[0].uri : null
-}
-
 resource "google_cloud_run_v2_service_iam_member" "api_invoker" {
   for_each = var.deploy_services ? toset(["gateway", "bootstrap", "scheduler", "tasks", "admin", "pubsub"]) : toset([])
 
