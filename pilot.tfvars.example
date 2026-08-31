@@ -1,0 +1,25 @@
+project_id                = "replace-me"
+region                    = "asia-northeast1"
+environment               = "pilot"
+organization_slug         = "example"
+backend_image             = "asia-northeast1-docker.pkg.dev/replace-me/openclaw/backend@sha256:replace-me"
+gateway_image             = "asia-northeast1-docker.pkg.dev/replace-me/openclaw/gateway@sha256:replace-me"
+auth_bootstrap_image      = "asia-northeast1-docker.pkg.dev/replace-me/openclaw/bootstrap@sha256:replace-me"
+migration_image           = "asia-northeast1-docker.pkg.dev/replace-me/openclaw/migration@sha256:replace-me"
+allowed_domain            = "example.com"
+google_client_id          = "replace-me.apps.googleusercontent.com"
+google_oauth_redirect_uri = "https://replace-me/v1/auth/callback"
+iap_access_members        = ["user:operator@example.com"]
+
+database_tier              = "db-g1-small"
+database_availability_type = "ZONAL"
+min_instances              = 0
+auth_bootstrap_min_instances = 0
+max_instances              = 2
+monthly_budget_jpy         = 7000
+billing_account_id         = "000000-000000-000000"
+enable_ai_analysis         = true
+gemini_daily_request_limit = 100
+
+deploy_services      = false
+deploy_migration_job = false

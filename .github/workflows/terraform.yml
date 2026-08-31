@@ -1,0 +1,135 @@
+name: Terraform checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub environment containing WIF, state, image, and Terraform variables
+        required: true
+        type: choice
+        options: [staging, prod]
+  repository_dispatch:
+    types: [back-contract-updated]
+  schedule:
+    - cron: "29 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: ${{ github.repository_owner }}/OpenclawSecretary-Back
+          ref: ${{ vars.BACK_CONTRACT_REF || 'main' }}
+          path: back
+          token: ${{ secrets.CROSS_REPO_READ_TOKEN || github.token }}
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: "1.10.5"
+      - uses: terraform-linters/setup-tflint@6e87008f9dd1fe3e34e66aca6c97b4a69f72a7f4 # v4
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false
+      - run: terraform validate
+      - run: terraform test
+      - run: terraform -chdir=bootstrap/state init -backend=false
+      - run: terraform -chdir=bootstrap/state validate
+      - run: tflint --init
+      - run: tflint --recursive
+      - run: node tools/check-back-contract.mjs ./back
+      - run: node tools/check-current-docs.mjs
+      - uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+  plan:
+    if: github.event_name == 'workflow_dispatch'
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+      TF_VAR_region: ${{ vars.GCP_REGION }}
+      TF_VAR_environment: ${{ inputs.environment }}
+      TF_VAR_organization_slug: ${{ vars.ORGANIZATION_SLUG }}
+      TF_VAR_backend_image: ${{ vars.BACKEND_IMAGE }}
+      TF_VAR_gateway_image: ${{ vars.GATEWAY_IMAGE }}
+      TF_VAR_auth_bootstrap_image: ${{ vars.AUTH_BOOTSTRAP_IMAGE }}
+      TF_VAR_migration_image: ${{ vars.MIGRATION_IMAGE }}
+      TF_VAR_allowed_domain: ${{ vars.ALLOWED_DOMAIN }}
+      TF_VAR_google_client_id: ${{ vars.GOOGLE_CLIENT_ID }}
+      TF_VAR_google_oauth_redirect_uri: ${{ vars.GOOGLE_OAUTH_REDIRECT_URI }}
+      TF_VAR_iap_access_members: ${{ vars.IAP_ACCESS_MEMBERS_JSON }}
+      TF_VAR_notification_channels: ${{ vars.NOTIFICATION_CHANNELS_JSON }}
+      TF_VAR_deploy_migration_job: ${{ vars.DEPLOY_MIGRATION_JOB }}
+      TF_VAR_deploy_services: ${{ vars.DEPLOY_SERVICES }}
+      COSIGN_CERTIFICATE_IDENTITY_REGEXP: ${{ vars.COSIGN_CERTIFICATE_IDENTITY_REGEXP }}
+      COSIGN_CERTIFICATE_OIDC_ISSUER: ${{ vars.COSIGN_CERTIFICATE_OIDC_ISSUER }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_TERRAFORM_SERVICE_ACCOUNT }}
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: "1.10.5"
+      - run: terraform init -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" -backend-config="prefix=${{ inputs.environment }}/openclaw"
+      - name: Configure Artifact Registry authentication
+        run: gcloud auth configure-docker "${TF_VAR_region}-docker.pkg.dev" --quiet
+      - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Verify image provenance signatures
+        shell: bash
+        run: |
+          test -n "$COSIGN_CERTIFICATE_IDENTITY_REGEXP"
+          test -n "$COSIGN_CERTIFICATE_OIDC_ISSUER"
+          for image in "$TF_VAR_backend_image" "$TF_VAR_gateway_image" "$TF_VAR_auth_bootstrap_image" "$TF_VAR_migration_image"; do
+            cosign verify \
+              --certificate-identity-regexp "$COSIGN_CERTIFICATE_IDENTITY_REGEXP" \
+              --certificate-oidc-issuer "$COSIGN_CERTIFICATE_OIDC_ISSUER" \
+              "$image"
+          done
+      - uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.TF_VAR_backend_image }}
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+      - uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.TF_VAR_gateway_image }}
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+      - uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.TF_VAR_auth_bootstrap_image }}
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+      - uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # 0.35.0
+        with:
+          scan-type: image
+          image-ref: ${{ env.TF_VAR_migration_image }}
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+      - run: terraform plan -input=false -lock-timeout=5m -out=tfplan
+      - run: terraform show -no-color tfplan > tfplan.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: terraform-plan-${{ inputs.environment }}
+          path: tfplan.txt
+          retention-days: 14

@@ -1,0 +1,15 @@
+{
+  "repository": "OpenclawSecretary-Back",
+  "openapi": {
+    "path": "docs/api/openapi.yaml",
+    "sha256": "2eeb7fb249413492d499742306b3f0db6c10cf09b6e00f20c03bd181c2abb9dd"
+  },
+  "config": {
+    "path": "src/config.js",
+    "sha256": "7ee6cf83348440f70ebbef111597fea22e0c24b90bafbe02af2c917d39697830"
+  },
+  "package": {
+    "path": "package.json",
+    "sha256": "bce50db0fc995df2ca459c45d5af4f55f8fb05e5bb85623729b1fe1323a28acf"
+  }
+}

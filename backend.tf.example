@@ -1,0 +1,6 @@
+terraform {
+  backend "gcs" {
+    bucket = "replace-openclaw-terraform-state"
+    prefix = "prod/openclaw"
+  }
+}
